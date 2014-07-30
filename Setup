@@ -1,0 +1,3 @@
+soundtouch_include_dir = /usr/local/include/soundtouch
+soundtouch_libs = SoundTouch
+soundtouch_lib_dir = /usr/local/lib
