@@ -1,0 +1,11 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: SoundTouch
+Description: SoundTouch is an open-source audio processing library for changing the Tempo, Pitch and Playback Rates of audio streams or files
+Version: 1.4.0
+Libs: -L${libdir} -lSoundTouch
+Cflags: -I${includedir}/soundtouch  
+
