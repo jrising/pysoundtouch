@@ -43,7 +43,7 @@ Finally, check that you can import soundtouch
 Simple Examples
 ---------------
 
-To use the library directly, audio must already be in an uncompressed, 2-byte-per-sample format.  For all other audio files, see the AudioReader and AudioWriter section and Shifter Tools below.
+To use the library directly, audio must already be in an uncompressed, 2-byte-per-sample format.  For all other audio files, see the AudioReader Tool and Shifter Tool sections below.
 
 Detecting the BPM of a .WAV file:
 
@@ -117,10 +117,10 @@ wf.close()
 del st
 ```
 
-AudioReader and AudioWriter
----------------------------
+AudioReader Tool
+----------------
 
-AudioReader and AudioWriter are abstractions around the audio handling tools in python, to make it easier to handle audio from many different formats.
+AudioReader is an abstraction around the audio handling tools in python, to make it easier to handle audio from many different formats.
 
 Currently MP3, WAV, AIF, and AU files are supported.
 
@@ -156,3 +156,30 @@ In addition, AudioReader classes can be used to transparently make changes to au
 * ConvertReader(source, set_channels=None, set_sampling_rate=None, set_raw_width=None): Convert the samples from one AudioReader into another format, changing the number of channels, sampling rate, and/or raw byte width.
 * ScaleReader(source, scale=1.0, bias=0): Scale the audio (volume) in an AudioReader; scale is > 1 to increase volume; bias is inaudible but can be changed to remove clicks.
 * AppendReader(one_path, two_path): Concatenate two audio files; the second will be converted to have the same format as the first.
+
+Shifter Tool
+------------
+
+The Shifter class provides a set of tools for using SoundTouch with the AudioReader system.
+
+Tools for Shifting Audio
+* shift_chunk(chunk, sampling_rate, channels, shift): Shift the pitch of a chunk of audio up or down
+* many_shift_chunk(chunk, sampling_rate, channels, shifts): Produce harmonies by shifting a chunk of audio more than once and combining them.
+* raw_shift_reader(srcpath, dstpath, shift): Shift an entire file up or down
+
+Example:
+
+```
+raw_shift_reader("mysong.mp3", "shifted_mysong.wav", 2)
+```
+
+Note that raw_shift_reader always produces a .WAV file.
+
+Tools for detected beats:
+* bpm_detect_file(fullpath): Detect the beat from an entire file
+* beats_to_ms(bpm, beats): Convert from bpm at a given beat rate to ms between beats.
+
+Other SoundTouch tools
+* get_flush(st, channels, fade=0): Get all additional chunks, and optionally fade out the volume on these samples.
+* echocancel(outputdata, inputdata): Try to identify an echo and remove it.
+* find_division_start(fullpath, bpm, beats_per): Identify the start of the beats, by finding segments that fit together

@@ -5,7 +5,7 @@ from array import array
 class Shifter:
     @staticmethod
     def shift_chunk(chunk, sampling_rate, channels, shift):
-        """Shift a chunk of audio up or down
+        """Shift the pitch of a chunk of audio up or down
         Width must be 2."""
         st = soundtouch.SoundTouch(sampling_rate, channels)
         st.set_pitch_shift(shift)
@@ -33,6 +33,7 @@ class Shifter:
 
     @staticmethod
     def many_shift_chunk(chunk, sampling_rate, channels, shifts):
+        """Produce harmonies by shifting a chunk of audio more than once and combining them."""
         shifteds = []
         maxlen = 0
         for jj in xrange(len(shifts)):
@@ -124,7 +125,7 @@ class Shifter:
     
     @staticmethod
     def bpm_detect_file(fullpath):
-        """Detect the beat from an entire reader"""
+        """Detect the beat from an entire file"""
         reader = AudioReader.open(fullpath)
         reader2 = ConvertReader(reader, set_raw_width=2)
 
@@ -143,7 +144,8 @@ class Shifter:
 
     @staticmethod
     def echocancel(outputdata, inputdata):
-        """Should contain 2-byte samples"""
+        """Try to identify an echo and remove it.
+        Should contain 2-byte samples"""
         pos = audioop.findmax(outputdata, 800)
         out_test = outputdata[pos*2:]
         in_test = inputdata[pos*2:]
@@ -156,10 +158,11 @@ class Shifter:
 
     @staticmethod
     def beats_to_ms(bpm, beats):
+        """Convert from bpm at a given beat rate to ms between beats."""
         return 60 * 1000 * beats / bpm
 
     @staticmethod
-    def find_division_start(fullpath, bpm, beats_per, procid=None):
+    def find_division_start(fullpath, bpm, beats_per):
         """Identify the start of the beats, by finding segments that fit together"""
         reader = AudioReader.open(fullpath)
 
@@ -226,9 +229,3 @@ class Shifter:
         reader2.close()
 
         return math.fmod(start_time, Shifter.beats_to_ms(bpm, beats_per))
-
-    @staticmethod
-    def close_debug():
-        st = soundtouch.SoundTouch(44100, 2)
-        st.flush()
-        del st
