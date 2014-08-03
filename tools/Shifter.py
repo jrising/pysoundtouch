@@ -109,7 +109,7 @@ class Shifter:
         st.clear()
 
         if len(result) > 2 * channels * waiting:
-            result[0:(2 * channels * waiting)]
+            result = result[0:(2 * channels * waiting)]
 
         fade = min(fade, len(result) / 2)
         if fade > 0:

@@ -1,31 +1,13 @@
-""" Notes for audiere:
-Poor documentation, no easy_install
-
-# Supports WAV, AIFF, OGG, FLAC, MP3, MOD, S3M, IT, XM
-# See http://audiere.sourceforge.net/features.php
-"""
-""" Notes for audiolib:
-from scikits.audiolab import Sndfile
-
-    # Try audiolib (Supports WAV, AIFF, SND, RAW, RAF, SVX, SF, VOC, W64, MAT, PVg, X1, HTK, CAF, SD2, FLAC, and OGG)
-    # See http://www.mega-nerd.com/libsndfile/#Features for full information
-    # Docs at http://www.ar.media.kyoto-u.ac.jp/members/david/softwares/audiolab/sphinx/index.html
-    try:
-        sndfile = Sndfile(filepath)
-        sndfile.read_frames(44100*60*60)
-"""
-""" Notes for PyMusic:
-Could not install ALSA, so PyMusic would not compile
-"""
-
 import mad, wave, aifc, sunau, time
 import Image, ImageDraw, math
 from array import array
 import audioop
 
+### Abstract AudioReader class
 class AudioReader:
     @staticmethod
     def open(filepath):
+        """Tries to determine the format of the file, and open it with an appropriate AudioReader subclass."""
         reader = AudioReader.reader(filepath)
         if not reader:
             return None
@@ -33,6 +15,7 @@ class AudioReader:
 
     @staticmethod
     def reader(filepath):
+        """Tries to determine the format of the file and returns an appropriate AudioReader subclass."""
         filelow = filepath.lower()
         if filelow.endswith('.mp3'):
             return MP3Reader
@@ -40,37 +23,45 @@ class AudioReader:
             return PCMReader
         return None
 
+    # All AudioReader objects keep track of end-of-file flags and if there are leftovers from a read operation
     def __init__(self, filepath):
         self.filepath = filepath
         self.eof = False
         self.leftovers = [] # leftovers from random_read/continue_read
 
+    # Call the close function on deallocation
     def __del__(self):
         try:
             self.close()
         except:
             pass
 
+    # OVERRIDE REQUIRED
     def sampling_rate(self):
         """Return the samples (frames) per second"""
         return 0
 
+    # OVERRIDE REQUIRED
     def duration(self):
         """Return the duration in ms"""
         return 0        
 
+    # OVERRIDE REQUIRED
     def current_time(self):
         """Return the current time in ms"""
         return 0
 
+    # OVERRIDE REQUIRED
     def seek_time(self, time):
         """Set the read pointer to the specified time (in ms)"""
         pass
 
+    # OVERRIDE REQUIRED
     def raw_width(self):
         """Return the width in bytes of raw samples"""
         pass
 
+    # OVERRIDE REQUIRED
     def raw_read(self):
         """Return some amount of data as a raw audio string"""
         pass
@@ -79,23 +70,28 @@ class AudioReader:
         """Is the raw data when this has a width of 1 stored in unsigned bytes (but not for higher widths)"""
         return False
 
+    # OVERRIDE REQUIRED
     def read(self):
         """Return some number of frames of an channel-interleaved array (len = NxC) of the appropriate sample depth"""
         pass
 
     def close(self):
+        """Perform any necessary cleanup on deallocation."""
         pass
 
     def random_read(self, start, end, debugs=None):
         """Return the frames between start and end"""
-        if self.current_time != start:
+        if self.current_time() != start:
             self.seek_time(start)
         lenout = int((end - start) * self.sampling_rate() / 1000.0) * self.channels()
         return self.length_read(lenout, debugs)
 
     def continue_read(self, end, debugs=None):
+        """Continue reading from the current read head."""
         if debugs is not None:
             debugs.append("Continue from " + str(len(self.leftovers)) + " + " + str(self.current_time()) + " to " + str(end))
+
+        # First take any samples from leftovers
         if self.leftovers:
             leftovers = self.leftovers
             self.leftovers = []
@@ -109,9 +105,11 @@ class AudioReader:
 
             return result
         else:
+            # Call random_read as necessary
             return self.random_read(self.current_time(), end, debugs)
 
     def length_read(self, lenout, debugs=None):
+        """Read a given number of samples, by repeated calls to read()."""
         result = self.read()
         if result is None:
             return None
@@ -121,6 +119,7 @@ class AudioReader:
                 break
             result.extend(data)
 
+        # Put any extra samples in leftovers
         if len(result) > lenout:
             self.leftovers = result[lenout:]
             result = result[:lenout]
@@ -160,6 +159,7 @@ class AudioReader:
         return result
 
     def audio_to_image(self, filepath, width, height, divisor=0, dividers=None, start=0, end=None):
+        """Construct a graph of the samples and save to filepath."""
         if (end is None):
             end = self.duration()
 
@@ -248,12 +248,15 @@ class AudioReader:
         image.save(out, "PNG")
         return maxEnergy
 
+### Reader of MP3 files
 class MP3Reader(AudioReader):
     def __init__(self, filepath):
+        # Use mad to read the MP3 file.
         AudioReader.__init__(self, filepath)
         self.mf = mad.MadFile(filepath)
 
     def channels(self):
+        # mad always returns a dual-channel stream
         return 2
 
     def sampling_rate(self):
@@ -294,6 +297,7 @@ class MP3Reader(AudioReader):
     def close(self):
         del self.mf
 
+### Reader for a simple PCM-based file format
 class PCMReader(AudioReader):    
     def __init__(self, filepath):
         AudioReader.__init__(self, filepath)
@@ -379,8 +383,11 @@ class PCMReader(AudioReader):
     def close(self):
         self.wf.close()
 
+### Convert the samples from one AudioReader into another format
 class ConvertReader(AudioReader):
     def __init__(self, source, set_channels=None, set_sampling_rate=None, set_raw_width=None):
+        """Constructor:
+        source is an AudioReader; give set_channels, set_sampling_rate, and set_raw_width based on what you want to change."""
         AudioReader.__init__(self, source.filepath)
         self.source = source
         self.set_channels = set_channels
@@ -415,12 +422,14 @@ class ConvertReader(AudioReader):
             self.eof = True
             return None
 
+        # Convert channels as needed
         if self.set_channels and self.source.channels() != self.set_channels:
             if self.set_channels == 1:
                 buf = audioop.tomono(buf, self.source.raw_width(), .5, .5)
             else:
                 buf = audioop.tostereo(buf, self.source.raw_width(), 1, 1)
 
+        # Convert sampling rate as needed
         if self.set_sampling_rate and self.source.sampling_rate() != self.set_sampling_rate:
             (buf, self.ratecv_state) = audioop.ratecv(buf, self.source.raw_width(), self.channels(), self.source.sampling_rate(), self.set_sampling_rate, self.ratecv_state)
 
@@ -438,8 +447,10 @@ class ConvertReader(AudioReader):
         return self.source.has_unsigned_singles()
 
     def read(self):
+        # raw_read handles all basic conversion
         buf = self.raw_read()
-        
+
+        # Convert width as needed
         if self.raw_width() == 1:
             data_array = array('b')
         elif self.raw_width() == 2:
@@ -453,8 +464,11 @@ class ConvertReader(AudioReader):
     def close(self):
         self.source.close()
 
+### Scale the audio (volume) in an AudioReader
 class ScaleReader(AudioReader):
     def __init__(self, source, scale=1.0, bias=0):
+        """Constructor:
+        source is an AudioReader; scale is > 1 to increase volume; bias is inaudible but can be changed to remove clicks."""
         AudioReader.__init__(self, source.filepath)
         self.source = source
         self.scale = scale
@@ -487,6 +501,7 @@ class ScaleReader(AudioReader):
             self.eof = True
             return None
 
+        # Perform the scaling and biasing
         if self.scale != 1.0:
             buf = audioop.mul(buf, self.source.raw_width(), self.scale)
 
@@ -500,6 +515,7 @@ class ScaleReader(AudioReader):
         return self.source.has_unsigned_singles()
 
     def read(self):
+        # raw_read performs the necessary changes
         buf = self.raw_read()
         if not buf:
             return None
@@ -517,10 +533,13 @@ class ScaleReader(AudioReader):
     def close(self):
         self.source.close()
 
+### Concatenate two audio files
 class AppendReader(AudioReader):
     def __init__(self, one_path, two_path):
+        """Constructor: give two paths to be opened and concatenated."""
         AudioReader.__init__(self, one_path)
         self.one_source = AudioReader.open(one_path)
+        # Convert the second file to be like the first
         self.two_source = ConvertReader(AudioReader.open(two_path), one_source.channels(), one_source.sampling_rate(), one_source.raw_width())
         self.current_time = 0
 
@@ -538,6 +557,7 @@ class AppendReader(AudioReader):
 
     def seek_time(self, time):
         """Set the read pointer to the specified time (in ms)"""
+        # Seek to one file or the other
         if time < self.one_source.duration():
             self.one_source.seek_time(time)
         else:
@@ -551,6 +571,7 @@ class AppendReader(AudioReader):
     def raw_read(self):
         """Return some amount of data as a raw audio string"""
         if self.current_time < self.one_source.duration():
+            # Read from the first audio source
             buf = self.one_source.raw_read()
             if buf is None:
                 buf = self.two_source.raw_read()
@@ -564,6 +585,7 @@ class AppendReader(AudioReader):
                 self.current_time = self.one_source.current_time()
                 return buf
         else:
+            # Read from the second audio source
             buf = self.two_source.raw_read()
             if buf is None:
                 self.eof = True
