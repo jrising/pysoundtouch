@@ -1,5 +1,6 @@
 /*
  * python interface to soundtouch (the open-source audio processing library)
+ * Expose BMP detection and Shifting to python
  */
 
 #include <SoundTouch.h>

@@ -17,7 +17,7 @@ First compile and install SoundTouch using integer samples.
 
 To compile on Linux and MacOS:
 
-You may need to get autoconf and libtool and delete config/m4/*.
+You may need to get autoconf and libtool.
 
 ```
 ./bootstap

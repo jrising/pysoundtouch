@@ -43,17 +43,18 @@ PyTypeObject py_bpmdetect_t = {
     NULL
 };
 
-/* functions */
-
+// Constructor
 PyObject* py_bpmdetect_new(PyObject* self, PyObject* args) {
   py_bpmdetect* ps = NULL;
   uint sampleRate, channels;
   
+  // Needs to be constructed with sampling rate and number of channels
   if (!PyArg_ParseTuple(args, "II:Soundtouch", &sampleRate, &channels)) {
     PyErr_SetString(PyExc_RuntimeError, "Requires sampling rate and number of channels (sample size must be 2)");
     return NULL;
   }
 
+  // Create the object
   ps = PyObject_NEW(py_bpmdetect, &py_bpmdetect_t);
   ps->bpmdetect = new soundtouch::BPMDetect((int) channels, (int) sampleRate);
   ps->channels = (int) channels;
@@ -61,6 +62,7 @@ PyObject* py_bpmdetect_new(PyObject* self, PyObject* args) {
   return (PyObject*) ps;
 }
 
+// Deallocate the BPMDetect object
 static void py_bpmdetect_dealloc(PyObject* self, PyObject* args) {
   py_bpmdetect* ps = PY_BPMDETECT(self);
 
@@ -72,29 +74,35 @@ static void py_bpmdetect_dealloc(PyObject* self, PyObject* args) {
   PyObject_DEL(self);
 }
 
+// Read in a number of samples for beat detection
 static PyObject* py_bpmdetect_put_samples(PyObject* self, PyObject* args) {
   py_bpmdetect* ps = PY_BPMDETECT(self);
   int buflen;
   char* transfer;
 
+  // Needs to be called with a string of samples
   if (!PyArg_ParseTuple(args, "s#", &transfer, &buflen)) {
     PyErr_SetString(PyExc_TypeError, "invalid argument");
 	return NULL;
   }
 
+  // Move all into our char-short union
   for (int ii = 0; ii < buflen; ii++)
     ps->buffer.chars[ii] = transfer[ii];
 
+  // Input them into the BMP detector
   ps->bpmdetect->inputSamples(ps->buffer.shorts, (uint) buflen / (2 * ps->channels));
 
   Py_INCREF(Py_None);
   return Py_None;
 }
 
-/* return the beats per minute */
+// Perform the beat detection algorithm
+// return the beats per minute
 static PyObject* py_bpmdetect_get_bpm(PyObject* self, PyObject* args) {
   py_bpmdetect* ps = PY_BPMDETECT(self);
 
+  // Return the BPM of the input samples
   float bpm = ps->bpmdetect->getBpm();
   
   return PyFloat_FromDouble(bpm);
@@ -108,6 +116,7 @@ static PyMethodDef bpmdetect_methods[] = {
     { NULL, 0, 0, NULL }
 };
 
+// Extract information from the bpmdetect object
 static PyObject* py_bpmdetect_getattr(PyObject* self, char* name) {
   return Py_FindMethod(bpmdetect_methods, self, name);
 }
