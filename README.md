@@ -157,6 +157,61 @@ In addition, AudioReader classes can be used to transparently make changes to au
 * ScaleReader(source, scale=1.0, bias=0): Scale the audio (volume) in an AudioReader; scale is > 1 to increase volume; bias is inaudible but can be changed to remove clicks.
 * AppendReader(one_path, two_path): Concatenate two audio files; the second will be converted to have the same format as the first.
 
+Here's how it can be combined with the SoundTouch library:
+
+```
+# Open the file and convert it to have SoundTouch's required 2-byte samples
+reader = AudioReader.open(srcpath)
+reader2 = ConvertReader(reader, set_raw_width=2)
+
+# Create the SoundTouch object and set the given shift
+st = soundtouch.SoundTouch(reader2.sampling_rate(), reader2.channels())
+st.set_pitch_shift(shift)
+
+# Create the .WAV file to write the result to
+writer = wave.open(dstpath, 'w')
+writer.setnchannels(reader2.channels())
+writer.setframerate(reader2.sampling_rate())
+writer.setsampwidth(reader2.raw_width())
+
+# Read values and feed them into SoundTouch
+while True:
+    data = reader2.raw_read()
+    if not data:
+        break
+
+    print len(data)
+    st.put_samples(data)
+
+    while st.ready_count() > 0:
+        writer.writeframes(st.get_samples(11025))
+
+# Flush any remaining samples
+waiting = st.waiting_count()
+ready = st.ready_count()
+flushed = ""
+
+# Add silence until another chunk is pushed out
+silence = array('h', [0] * 64)
+while st.ready_count() == ready:
+    st.put_samples(silence)
+
+# Get all of the additional samples
+while st.ready_count() > 0:
+    flushed += st.get_samples(4000)
+
+st.clear()
+
+if len(flushed) > 2 * reader2.getnchannels() * waiting:
+    flushed = flushed[0:(2 * reader2.getnchannels() * waiting)]
+
+writer.writeframes(flushed)
+
+# Clean up
+writer.close()
+reader2.close()
+```
+
 Shifter Tool
 ------------
 
@@ -178,8 +233,8 @@ Note that raw_shift_reader always produces a .WAV file.
 Tools for detected beats:
 * bpm_detect_file(fullpath): Detect the beat from an entire file
 * beats_to_ms(bpm, beats): Convert from bpm at a given beat rate to ms between beats.
+* find_division_start(fullpath, bpm, beats_per): Identify the start of the beats, by finding segments that fit together
 
 Other SoundTouch tools
 * get_flush(st, channels, fade=0): Get all additional chunks, and optionally fade out the volume on these samples.
 * echocancel(outputdata, inputdata): Try to identify an echo and remove it.
-* find_division_start(fullpath, bpm, beats_per): Identify the start of the beats, by finding segments that fit together
