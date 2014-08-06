@@ -64,17 +64,21 @@ class Shifter:
     @staticmethod
     def raw_shift_reader(srcpath, dstpath, shift):
         """Shift an entire file up or down"""
+        # Open the file and convert it to have SoundTouch's required 2-byte samples
         reader = AudioReader.open(srcpath)
         reader2 = ConvertReader(reader, set_raw_width=2)
 
+        # Create the SoundTouch object and set the given shift
         st = soundtouch.SoundTouch(reader2.sampling_rate(), reader2.channels())
         st.set_pitch_shift(shift)
 
+        # Create the .WAV file to write the result to
         writer = wave.open(dstpath, 'w')
         writer.setnchannels(reader2.channels())
         writer.setframerate(reader2.sampling_rate())
         writer.setsampwidth(reader2.raw_width())
 
+        # Read values and feed them into SoundTouch
         while True:
             data = reader2.raw_read()
             if not data:
@@ -86,7 +90,10 @@ class Shifter:
             while st.ready_count() > 0:
                 writer.writeframes(st.get_samples(11025))
 
+        # Flush any remaining values
         writer.writeframes(Shifter.get_flush(st, reader2.channels()))
+
+        # Clean up
         writer.close()
         reader2.close()
 
