@@ -13,17 +13,18 @@ in SoundTouch to Python.
 Installation
 ------------
 
-First compile and install SoundTouch using integer samples.
+First compile and install SoundTouch using integer samples.  To compile on Linux and MacOS:
 
-To compile on Linux and MacOS:
+1. You will need to install autoconf and libtool if you do not already have them.  Using brew on a Mac, `brew install automake`
 
-You may need to get autoconf and libtool.
-
+2. Run the following
 ```
-./bootstap
+cd soundtouch
+./bootstrap
 ./configure --enable-integer-samples CXXFLAGS="-fPIC"
 make
 sudo make install
+cd ..
 ```
 
 Then, run setup.py
@@ -32,7 +33,7 @@ Then, run setup.py
 sudo python setup.py install
 ```
 
-Finally, check that you can import soundtouch
+Finally, check that you can import soundtouch.  Within python:
 
 ```
 >>> import soundtouch
